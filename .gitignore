@@ -1,0 +1,3 @@
+# Tool-generated config backups (e.g. omarchy/hypridle writes *.bak.<timestamp>)
+*.bak
+*.bak.*
