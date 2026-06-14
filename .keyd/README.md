@@ -20,12 +20,18 @@ Alt still works normally for everything else (Alt+Tab, Alt+F4, …).
 ## Install (per box)
 
 ```bash
-cd ~/.dotfiles/keyd && ./install.sh
+cd ~/.dotfiles/.keyd && ./install.sh
 ```
 
 This installs keyd (pacman on Arch, apt-or-source on Mint), symlinks
 `/etc/keyd/default.conf` → this repo's `etc/keyd/default.conf`, and enables
 the service. Idempotent — safe to re-run.
+
+> **Not an omadot/stow package.** This dir is intentionally hidden (`.keyd`)
+> so `omadot put --all` and `omadot list` skip it on every machine. keyd's
+> config lives in root-owned `/etc`, not `$HOME`, so it can't be stowed —
+> never run `omadot put .keyd` (it would create junk symlinks in `$HOME`).
+> Use `./install.sh` above instead.
 
 ## Syncing a change
 
