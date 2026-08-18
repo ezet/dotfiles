@@ -64,8 +64,8 @@ if [ "${NO_SUDOERS:-0}" != "1" ]; then
   keyd_bin="$(command -v keyd)"
   sudoers="/etc/sudoers.d/keyd-reload"
   tmp_sudoers="$(mktemp)"
-  chmod 0440 "$tmp_sudoers"
   printf '%s ALL=(root) NOPASSWD: %s reload\n' "$(id -un)" "$keyd_bin" >"$tmp_sudoers"
+  chmod 0440 "$tmp_sudoers"   # visudo warns on a world-readable sudoers file
   if sudo visudo -cqf "$tmp_sudoers"; then
     sudo install -m 0440 -o root -g root "$tmp_sudoers" "$sudoers"
     log "Installed $sudoers (passwordless '$keyd_bin reload')"
