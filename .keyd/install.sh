@@ -56,3 +56,21 @@ log "Linked $TARGET -> $SRC"
 sudo systemctl enable --now keyd
 sudo keyd reload
 log "keyd is active. Hold Alt + i/j/k/l for arrows."
+
+# 4. Allow passwordless `keyd reload` for this user, so config changes pulled on
+#    any box apply unattended (used by the omarchy post-update hook).
+#    Skip with:  NO_SUDOERS=1 ./install.sh
+if [ "${NO_SUDOERS:-0}" != "1" ]; then
+  keyd_bin="$(command -v keyd)"
+  sudoers="/etc/sudoers.d/keyd-reload"
+  tmp_sudoers="$(mktemp)"
+  chmod 0440 "$tmp_sudoers"
+  printf '%s ALL=(root) NOPASSWD: %s reload\n' "$(id -un)" "$keyd_bin" >"$tmp_sudoers"
+  if sudo visudo -cqf "$tmp_sudoers"; then
+    sudo install -m 0440 -o root -g root "$tmp_sudoers" "$sudoers"
+    log "Installed $sudoers (passwordless '$keyd_bin reload')"
+  else
+    echo "Generated sudoers file failed validation; not installing it." >&2
+  fi
+  rm -f "$tmp_sudoers"
+fi

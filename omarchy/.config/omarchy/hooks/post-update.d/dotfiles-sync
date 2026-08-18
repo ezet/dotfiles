@@ -1,0 +1,44 @@
+#!/bin/bash
+#
+# Omarchy post-update hook: pull this dotfiles repo and reload keyd, so a config
+# change committed on one device lands on the others at their next
+# `omarchy update` without any manual step.
+#
+# Installed by:  omadot put omarchy
+# Passwordless `keyd reload` comes from /etc/sudoers.d/keyd-reload, written by
+# ~/.dotfiles/.keyd/install.sh. Without it, the reload is skipped silently.
+
+set -uo pipefail
+
+DOTFILES="$HOME/.dotfiles"
+KEYD_CONF="$DOTFILES/.keyd/etc/keyd/default.conf"
+
+note() {
+  echo "dotfiles: $1"
+  command -v notify-send >/dev/null 2>&1 && notify-send -u low "dotfiles" "$1"
+}
+
+[ -d "$DOTFILES/.git" ] || exit 0
+
+# Only pull on a clean tree — never clobber local edits during a system update.
+if ! git -C "$DOTFILES" diff --quiet HEAD 2>/dev/null; then
+  note "local changes present; skipped pull"
+  exit 0
+fi
+
+before="$(git -C "$DOTFILES" rev-parse HEAD)"
+git -C "$DOTFILES" pull --ff-only --quiet || { note "pull failed"; exit 0; }
+after="$(git -C "$DOTFILES" rev-parse HEAD)"
+[ "$before" = "$after" ] && exit 0
+
+note "pulled $(git -C "$DOTFILES" rev-list --count "$before..$after") commit(s)"
+
+# Reload keyd only when the live config really is a link into this repo.
+if [ "$(readlink -f /etc/keyd/default.conf 2>/dev/null)" = "$(readlink -f "$KEYD_CONF")" ]; then
+  sudo -n keyd reload 2>/dev/null && note "keyd reloaded"
+elif [ -e "$KEYD_CONF" ]; then
+  note "/etc/keyd not linked to repo — run ~/.dotfiles/.keyd/install.sh"
+fi
+
+# Stow packages are symlinked per-file, so a pull that adds new files needs a
+# re-stow. Existing files are already live via their symlinks.

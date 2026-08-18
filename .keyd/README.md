@@ -24,8 +24,17 @@ cd ~/.dotfiles/.keyd && ./install.sh
 ```
 
 This installs keyd (pacman on Arch, apt-or-source on Mint), symlinks
-`/etc/keyd/default.conf` → this repo's `etc/keyd/default.conf`, and enables
-the service. Idempotent — safe to re-run.
+`/etc/keyd/default.conf` → this repo's `etc/keyd/default.conf`, enables the
+service, and installs `/etc/sudoers.d/keyd-reload` so this user can run
+`sudo keyd reload` without a password. Idempotent — safe to re-run.
+
+Skip the sudoers drop-in with `NO_SUDOERS=1 ./install.sh`. It exists so the
+`omarchy` package's `post-update` hook can apply a pulled config change
+unattended; without it that reload is silently skipped.
+
+> Note: the live config is a symlink into `$HOME`, so anything running as you
+> can already change what this root daemon loads. The NOPASSWD rule is scoped to
+> `keyd reload` alone and widens nothing beyond that existing property.
 
 > **Not an omadot/stow package.** This dir is intentionally hidden (`.keyd`)
 > so `omadot put --all` and `omadot list` skip it on every machine. keyd's
