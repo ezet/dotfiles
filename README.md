@@ -13,6 +13,7 @@ place, `omadot get <pkg>` imports a live config back into the repo.
 | `waybar` | omadot/stow → `~/.config`  | ❌ Omarchy / Hyprland               | Wayland status bar; Mint/Cinnamon doesn't use it. |
 | `.keyd`  | **own installer** (not omadot) | ✅ any Linux (Arch + Mint)      | Root-owned `/etc/keyd`. Hidden so omadot auto-skips it. See [`.keyd/README.md`](.keyd/README.md). |
 | `omarchy` | omadot/stow → `~/.config`  | ❌ Omarchy only                     | `post-update` hook: auto-pull this repo + `keyd reload` after `omarchy update`. See [`omarchy/README.md`](omarchy/README.md). |
+| `claude` | omadot/stow → `~/.claude`  | ✅ any Linux                        | Personal Claude Code skills. Folds into the live `~/.claude/skills`, leaving the Omarchy-provided skill symlinks there unmanaged. Some skills shell out to helpers in `~/.local/bin`, which this repo does not carry. |
 
 ## Bootstrapping a machine
 
