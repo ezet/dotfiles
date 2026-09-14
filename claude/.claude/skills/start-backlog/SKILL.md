@@ -13,9 +13,6 @@ Fill the board to **X in flight** — In progress plus In review, X defaulting t
 **10** — one agent per issue, each on a **footprint** no other agent in flight
 shares. Ten agents in one repo is normal; two in one file is a pile-up.
 
-With `--unattended`, read [unattended.md](unattended.md) first: it adds a
-screen to step 5, a line to each prompt, and a section to the report.
-
 ## 1. Require herdr
 
 ```bash
@@ -62,6 +59,19 @@ items that each add a migration, which conflict on the migration graph however
 far apart their files sit.
 
 ## 5. Pick
+
+With `--unattended`, nobody is watching, so first drop every candidate whose
+agent could not reach a PR ready for your review without asking you anything —
+one that fails either test:
+
+- **Decided** — the issue says what to do. A question of product behaviour,
+  naming, UX or scope is yours, and an agent that answers it has invented a
+  requirement. An issue too vague to judge fails here.
+- **Reachable** — everything it needs is in a repo the agent checks out. A
+  third-party dashboard, a credential you hold, an app-store step or a deploy
+  you trigger fails here.
+
+Slots the survivors cannot fill stay empty.
 
 Walk the ranking. Take each candidate that collides with nothing in flight and
 nothing already picked; pass over the rest. Stop at the deficit or the end of
