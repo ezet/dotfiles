@@ -1,7 +1,7 @@
 ---
 name: start-backlog
 description: Start backlog issues as parallel herdr agents until X are in flight (default 10), picking work that cannot collide.
-argument-hint: "X — how many items to keep in flight (default 10)"
+argument-hint: "[X] [--unattended] — keep X items in flight (default 10); --unattended picks only work that needs nothing from you"
 disable-model-invocation: true
 ---
 
@@ -9,19 +9,20 @@ disable-model-invocation: true
 
 Board: **LKs agent project** — <https://github.com/orgs/hoopit/projects/2>.
 
-Fill the board up to **X in flight** — In progress plus In review — where X is
-this skill's argument, default **10**. Each started issue gets its own agent
-and a **footprint** no other agent in flight shares. Ten agents in one repo is
-normal here; ten agents editing one file is a pile-up.
+Fill the board to **X in flight** — In progress plus In review, X defaulting to
+**10** — one agent per issue, each on a **footprint** no other agent in flight
+shares. Ten agents in one repo is normal; two in one file is a pile-up.
 
-## 1. Require a herdr session
+With `--unattended`, read [unattended.md](unattended.md) first: it adds a
+screen to step 5, a line to each prompt, and a section to the report.
+
+## 1. Require herdr
 
 ```bash
 echo "${HERDR_ENV:-}"
 ```
 
-The agents live in herdr tabs, so a session outside one has nowhere to put
-them: anything but `1` here ends the run, with that said plainly.
+The agents live in herdr tabs. Anything but `1` ends the run, said plainly.
 
 ## 2. Measure the deficit
 
@@ -29,107 +30,81 @@ them: anything but `1` here ends the run, with that said plainly.
 hoopit-board slots <X>
 ```
 
-`hoopit-board` (in `~/.local/bin`) is the board's mechanical half — fetching,
-filtering, ranking, freshness gates and bulk writes; `--help` lists the rest. `slots` prints the in-flight count against X,
-the deficit, the Backlog items too untriaged to rank, and the rest ranked
-Priority `P0`→`P3` then smallest Size first, so a slot buys a finished PR
-rather than a week of work.
+Prints what is in flight, the deficit, the untriaged Backlog, and the rest
+ranked Priority `P0`→`P3` then smallest Size — so a slot buys a finished PR
+rather than a week of work. `hoopit-board --help` lists its other commands.
 
-A deficit of zero or less **completes** the run: report what is in flight and
-stop. A full board is the expected state, not a problem to solve by starting
-something anyway.
+A deficit of zero or less completes the run: report what is in flight and
+stop. Full is the board's resting state.
 
-## 3. Footprint the work in flight
+## 3. Triage the unranked
 
-```bash
-hoopit-board footprint <repo>...
-```
-
-One line per path an open PR is touching, and which PRs touch it — the map the
-picks have to stay off. An in-flight item with no PR yet leaves no trace here,
-so take its footprint from the paths its issue body names.
-
-## 4. Triage what the ranking left out
-
-An item with no Priority or Size cannot be ranked, which is why `slots` lists
-those separately. Set them — the rubrics are in the `create-gh-issue` skill —
-and the next `slots` run ranks them with the rest:
+Set Priority and Size on each untriaged item — rubrics in `create-gh-issue` —
+then rerun `slots` so they rank with the rest:
 
 ```bash
 hoopit-board triage <repo> <n> --priority P2 --size M
 ```
 
-## 5. Footprint each candidate
-
-From the paths its body names, plus a grep for the symbols and endpoints it
-mentions. An issue too vague to footprint owns its whole module: assume wide
-and let it collide.
-
-## 6. Fill the slots
-
-Walk the ranking and take each candidate whose footprint is disjoint from every
-in-flight footprint and every candidate already picked. On a collision, skip it
-and continue down the ranking. Stop at the deficit, or when the ranking runs
-out.
-
-A collision is a shared file, a shared model, a shared endpoint — or, in
-`hoopit/api`, two candidates that both add a migration, which conflict on the
-migration graph however far apart their files sit.
-
-Every slot left empty is reported with the item that would have filled it and
-the collision that blocked it. A P0 that collides stays on the board and goes
-in that report — it is the one thing here worth interrupting for.
-
-## 7. Check, claim, then dispatch
-
-The board dump is minutes old by now and a claim is a write, so confirm each
-pick is still startable:
+## 4. Map the footprints in flight
 
 ```bash
-hoopit-board check <repo> <n>
+hoopit-board footprint <repo>...
 ```
 
-It exits non-zero, naming the reason, on an issue that is closed, one a PR
-already claims to close, one blocked by another, or one a previous run already
-started. A `SKIP` drops the candidate and the next one down the ranking takes
-the slot.
+Lists every path an open PR touches. An in-flight item with no PR yet — and
+every candidate, as step 5 reaches it — takes its footprint from the paths its
+body names plus a grep for the symbols and endpoints it mentions. An issue too
+vague to footprint owns its whole module.
 
-Then claim it, before the agent exists. The board is how a second agent sees
-that an issue is taken, so a claim landing after the agent starts is a claim
-landing too late.
+A **collision** is a shared file, model or endpoint — or, in `hoopit/api`, two
+items that each add a migration, which conflict on the migration graph however
+far apart their files sit.
 
-```bash
-hoopit-board claim <repo> <n> --agent <name> --tab <label>
-```
+## 5. Pick
 
-That moves the item to In progress and comments the agent and tab onto the
-issue — the marker `check` reads on later runs, and the one `curate-backlog`
-reads to tell an abandoned item from a busy one.
+Walk the ranking. Take each candidate that collides with nothing in flight and
+nothing already picked; pass over the rest. Stop at the deficit or the end of
+the ranking.
 
-Then dispatch through the `herdr` skill — one agent per issue, in the workspace
-for that issue's repo, in its own tab named for the issue. These agents run on
-Fable: pass `--model fable` among the native arguments after the `--`.
+Record each empty slot with the candidate that would have filled it and the
+collision that blocked it. A colliding P0 stays on the board and heads that
+record — it is the one thing here worth interrupting for.
 
-Each agent's opening prompt carries four things:
+## 6. Check, claim, dispatch
 
-- the repo and the issue URL, to read for itself;
-- a fresh worktree of its own, so ten agents never share a checkout;
+Per pick, in order:
+
+1. `hoopit-board check <repo> <n>` — the ranking is minutes old. A non-zero
+   exit names why the issue is no longer startable; drop it, and the next
+   candidate that clears step 5 takes the slot.
+2. `hoopit-board claim <repo> <n> --agent <name> --tab <label>`, before the
+   agent exists. It moves the item to In progress and comments the agent and
+   tab onto the issue — the marker later runs and `curate-backlog` read to see
+   the issue is taken.
+3. Dispatch through the `herdr` skill, in the workspace for the issue's repo
+   and a tab named for the issue. After the `--`, pass `--model fable` for
+   complicated work — Size `L`, a cause nobody has found, an approach still to
+   decide, or a change across modules, migrations, concurrency or money; Size
+   prices the fix, not the hunt — and `--model opus` for the rest.
+
+The opening prompt carries:
+
+- the repo and the issue URL;
+- delivery through the `hoopit-dev:ship` skill, the issue as its `WORK_ITEM`;
 - `closes #<n>` in the PR description;
-- the paths the other agents in flight own, to stay clear of.
+- the paths the other agents own, to stay off;
+- a **lead** where you have one — a file, a symbol, a log line to start from.
 
-Add a **lead** where you have one — a file, a symbol, a failing log line worth
-starting from. A lead points; it does not conclude. Anything that reads as a
-cause travels marked as a guess, and the agent owes a verdict on it: name what
-would prove the guess wrong, go look for that, then report it confirmed or
-replaced by what was actually wrong. The falsifier is what makes the verdict
-worth having — an agent asked to confirm a guess confirms it, and a wrong
-premise comes back wearing a second signature.
+A lead points; the agent draws the conclusion. Anything that reads as a cause —
+in the lead, or in the issue body, written from outside the code — travels as a
+**guess** the agent owes a verdict on: name what would prove it wrong, go look
+for that, and report it confirmed or replaced, in the PR when replaced. The
+falsifier is what makes the verdict worth having; an agent asked to confirm a
+guess confirms it.
 
-The issue body is a guess by the same standard, written from outside the code.
-It gets the same falsifier before any fix is written, and the PR says so when
-the real cause turned out to be different.
+## 7. Report
 
-## 8. Report
-
-A table — issue, repo, Priority/Size, agent name, footprint — then the empty
-slots and what blocked each. Finish with the in-flight count, before and after.
+A table — issue, repo, Priority/Size, agent, model with its one-clause reason,
+footprint — then the empty slots and what blocked each, then the in-flight
+count before and after.
